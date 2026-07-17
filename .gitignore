@@ -1,0 +1,23 @@
+# MongoDB local installation
+mongodb-linux-x86_64-*/
+mongodb.tgz
+data/
+
+# Backend
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
