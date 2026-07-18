@@ -29,14 +29,6 @@ function Layout() {
                 Contact
               </Link>
             </li>
-            <li>
-              <Link
-                to="/news"
-                className={location.pathname.startsWith('/news') ? 'active' : ''}
-              >
-                News
-              </Link>
-            </li>
           </ul>
         </div>
       </nav>

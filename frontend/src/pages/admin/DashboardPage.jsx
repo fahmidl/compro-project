@@ -6,7 +6,6 @@ function DashboardPage() {
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  const [role, setRole] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -14,7 +13,6 @@ function DashboardPage() {
       navigate('/admin/login')
       return
     }
-    setRole(localStorage.getItem('role') || '')
 
     getContent()
       .then((res) => setContent(res.data))
@@ -24,7 +22,6 @@ function DashboardPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('token')
-    localStorage.removeItem('role')
     navigate('/admin/login')
   }
 
@@ -71,22 +68,6 @@ function DashboardPage() {
               Edit Contact
             </Link>
           </div>
-          <div className="dashboard-card">
-            <h3>News</h3>
-            <p>Manage news posts</p>
-            <Link to="/admin/news" className="btn btn-primary">
-              Manage News
-            </Link>
-          </div>
-          {role === 'admin' && (
-            <div className="dashboard-card">
-              <h3>Users</h3>
-              <p>Manage users and roles</p>
-              <Link to="/admin/users" className="btn btn-primary">
-                Manage Users
-              </Link>
-            </div>
-          )}
         </div>
       </div>
     </div>

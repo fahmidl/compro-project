@@ -42,26 +42,6 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		c.Set("username", claims["username"])
-		if role, exists := claims["role"]; exists {
-			c.Set("role", role)
-		}
-		c.Next()
-	}
-}
-
-func RequireRole(roles ...string) gin.HandlerFunc {
-	allowed := make(map[string]bool)
-	for _, r := range roles {
-		allowed[r] = true
-	}
-	return func(c *gin.Context) {
-		role, _ := c.Get("role")
-		roleStr, _ := role.(string)
-		if !allowed[roleStr] {
-			c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
-			c.Abort()
-			return
-		}
 		c.Next()
 	}
 }
