@@ -45,4 +45,16 @@ export const uploadImage = (file) => {
   })
 }
 
+// News
+export const getNews = () => api.get('/news')
+export const getNewsPost = (id) => api.get(`/news/${id}`)
+export const createNews = (data) => api.post('/news', data)
+export const updateNews = (id, data) => api.put(`/news/${id}`, data)
+export const deleteNews = (id) => api.delete(`/news/${id}`)
+
+// User management
+export const listUsers = () => api.get('/auth/users')
+export const createUser = (data) => api.post('/auth/users', data)
+export const deleteUser = (id) => api.delete(`/auth/users/${id}`)
+
 export default api

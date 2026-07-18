@@ -418,4 +418,213 @@ body {
     flex-direction: column;
     gap: 15px;
   }
+
+  .news-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* News Section */
+.news-section {
+  padding: 80px 0;
+}
+
+.news-section h1 {
+  font-size: 2.5rem;
+  margin-bottom: 40px;
+  text-align: center;
+  color: #1a1a2e;
+}
+
+.news-empty {
+  text-align: center;
+  color: #666;
+  font-size: 1.1rem;
+  padding: 40px 0;
+}
+
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 30px;
+}
+
+.news-card {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+}
+
+.news-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.news-card-image img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.news-card-body {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.news-card-body h2 {
+  font-size: 1.3rem;
+  margin-bottom: 8px;
+  color: #1a1a2e;
+}
+
+.news-card-meta {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+.news-card-summary {
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  flex: 1;
+}
+
+.news-card-link {
+  margin-top: 15px;
+  color: #0f3460;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* News Detail */
+.news-detail-section {
+  padding: 60px 0;
+}
+
+.news-back-link {
+  display: inline-block;
+  margin-bottom: 30px;
+  color: #0f3460;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.news-back-link:hover {
+  text-decoration: underline;
+}
+
+.news-detail {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.news-detail h1 {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: #1a1a2e;
+}
+
+.news-detail-meta {
+  font-size: 0.95rem;
+  color: #888;
+  margin-bottom: 30px;
+}
+
+.news-detail-image {
+  margin-bottom: 30px;
+}
+
+.news-detail-image img {
+  width: 100%;
+  border-radius: 8px;
+  max-height: 500px;
+  object-fit: cover;
+}
+
+.news-detail-content p {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: #444;
+  margin-bottom: 16px;
+}
+
+/* News Table */
+.news-table-wrapper {
+  overflow-x: auto;
+}
+
+.news-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.news-table th,
+.news-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.news-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.news-table td {
+  color: #555;
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  margin-right: 8px;
+}
+
+/* Form Select */
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background: #fff;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #0f3460;
+}
+
+/* Role Badge */
+.role-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.role-admin {
+  background: #e8d5f5;
+  color: #6b21a8;
+}
+
+.role-editor {
+  background: #d1f0e8;
+  color: #047857;
 }
