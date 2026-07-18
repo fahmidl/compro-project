@@ -6,6 +6,7 @@ data/
 # Backend
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/server
 
 # Frontend
 frontend/node_modules/
