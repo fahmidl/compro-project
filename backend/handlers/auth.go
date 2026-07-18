@@ -59,10 +59,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Default role for legacy admins without a role
+	// Default role for legacy admins without a role field
 	role := admin.Role
 	if role == "" {
-		role = "editor"
+		role = "admin"
+		// Persist the role back to DB for future logins
+		h.Collection.UpdateOne(context.Background(), bson.M{"_id": admin.ID}, bson.M{"$set": bson.M{"role": "admin"}})
 	}
 
 	secret := os.Getenv("JWT_SECRET")
