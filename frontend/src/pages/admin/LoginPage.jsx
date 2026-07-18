@@ -17,6 +17,7 @@ function LoginPage() {
     try {
       const res = await login(username, password)
       localStorage.setItem('token', res.data.token)
+      localStorage.setItem('role', res.data.role)
       navigate('/admin')
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed')
