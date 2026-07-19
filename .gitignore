@@ -8,6 +8,7 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 backend/server
 backend/bootstrap
+backend/function.zip
 
 # Frontend
 frontend/node_modules/
@@ -15,6 +16,7 @@ frontend/dist/
 
 # Environment
 .env
+*.env.local
 
 # IDE
 .vscode/
