@@ -8,6 +8,7 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 backend/server
 backend/bootstrap
+backend/bootstrap.zip
 backend/function.zip
 
 # Frontend
