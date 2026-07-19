@@ -1,26 +1,23 @@
 package handlers
 
 import (
-	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
+	"compro-backend/db"
 	"compro-backend/models"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type NewsHandler struct {
-	Collection *mongo.Collection
+	DB *db.DB
 }
 
-func NewNewsHandler(db *mongo.Database) *NewsHandler {
-	return &NewsHandler{Collection: db.Collection("news_posts")}
+func NewNewsHandler(database *db.DB) *NewsHandler {
+	return &NewsHandler{DB: database}
 }
 
 func generateSlug(title string) string {
@@ -52,40 +49,27 @@ type updatePostRequest struct {
 }
 
 func (h *NewsHandler) GetPosts(c *gin.Context) {
-	opts := options.Find().SetSort(bson.D{{Key: "publishedAt", Value: -1}})
-	cursor, err := h.Collection.Find(context.Background(), bson.M{}, opts)
+	posts, err := h.DB.ListNews(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch posts"})
 		return
 	}
-	defer cursor.Close(context.Background())
-
-	var posts []models.NewsPost
-	if err := cursor.All(context.Background(), &posts); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode posts"})
-		return
-	}
-
 	if posts == nil {
 		posts = []models.NewsPost{}
 	}
-
 	c.JSON(http.StatusOK, posts)
 }
 
 func (h *NewsHandler) GetPost(c *gin.Context) {
 	id := c.Param("id")
 
-	// Try to find by ObjectID first, then by slug
-	objectID, err := primitive.ObjectIDFromHex(id)
-	var post models.NewsPost
-	if err == nil {
-		err = h.Collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&post)
-	} else {
-		err = h.Collection.FindOne(context.Background(), bson.M{"slug": id}).Decode(&post)
+	// Try to find by ID first, then fall back to slug lookup
+	post, err := h.DB.GetNewsByID(c.Request.Context(), id)
+	if errors.Is(err, db.ErrNotFound) {
+		// Not found by ID — try by slug
+		post, err = h.DB.GetNewsBySlug(c.Request.Context(), id)
 	}
-
-	if err == mongo.ErrNoDocuments {
+	if errors.Is(err, db.ErrNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
 		return
 	}
@@ -105,7 +89,7 @@ func (h *NewsHandler) CreatePost(c *gin.Context) {
 	}
 
 	username, _ := c.Get("username")
-	now := primitive.NewDateTimeFromTime(time.Now())
+	now := time.Now().UnixMilli()
 
 	post := models.NewsPost{
 		Title:       req.Title,
@@ -119,21 +103,24 @@ func (h *NewsHandler) CreatePost(c *gin.Context) {
 		UpdatedAt:   now,
 	}
 
-	result, err := h.Collection.InsertOne(context.Background(), post)
-	if err != nil {
+	if err := h.DB.CreateNews(c.Request.Context(), &post); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create post"})
 		return
 	}
 
-	post.ID = result.InsertedID.(primitive.ObjectID)
 	c.JSON(http.StatusCreated, post)
 }
 
 func (h *NewsHandler) UpdatePost(c *gin.Context) {
 	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
+
+	existing, err := h.DB.GetNewsByID(c.Request.Context(), id)
+	if errors.Is(err, db.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		return
+	}
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post id"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch post"})
 		return
 	}
 
@@ -143,59 +130,46 @@ func (h *NewsHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	// Build update fields
-	update := bson.M{"updatedAt": primitive.NewDateTimeFromTime(time.Now())}
+	// Apply updates
 	if req.Title != "" {
-		update["title"] = req.Title
-		update["slug"] = generateSlug(req.Title)
+		existing.Title = req.Title
+		existing.Slug = generateSlug(req.Title)
 	}
 	if req.Content != "" {
-		update["content"] = req.Content
+		existing.Content = req.Content
 	}
 	if req.Summary != "" {
-		update["summary"] = req.Summary
+		existing.Summary = req.Summary
 	}
 	if req.Image != "" {
-		update["image"] = req.Image
+		existing.Image = req.Image
 	}
+	existing.UpdatedAt = time.Now().UnixMilli()
 
-	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-	var updated models.NewsPost
-	err = h.Collection.FindOneAndUpdate(
-		context.Background(),
-		bson.M{"_id": objectID},
-		bson.M{"$set": update},
-		opts,
-	).Decode(&updated)
-
-	if err == mongo.ErrNoDocuments {
-		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
-		return
-	}
-	if err != nil {
+	if err := h.DB.UpdateNews(c.Request.Context(), existing); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update post"})
 		return
 	}
 
-	c.JSON(http.StatusOK, updated)
+	c.JSON(http.StatusOK, existing)
 }
 
 func (h *NewsHandler) DeletePost(c *gin.Context) {
 	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post id"})
-		return
-	}
 
-	result, err := h.Collection.DeleteOne(context.Background(), bson.M{"_id": objectID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete post"})
-		return
-	}
-
-	if result.DeletedCount == 0 {
+	// Verify the post exists before deleting
+	_, err := h.DB.GetNewsByID(c.Request.Context(), id)
+	if errors.Is(err, db.ErrNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch post"})
+		return
+	}
+
+	if err := h.DB.DeleteNews(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete post"})
 		return
 	}
 

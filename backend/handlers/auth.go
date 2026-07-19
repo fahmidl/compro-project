@@ -1,27 +1,25 @@
 package handlers
 
 import (
-	"context"
+	"errors"
 	"net/http"
 	"os"
 	"time"
 
+	"compro-backend/db"
 	"compro-backend/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthHandler struct {
-	Collection *mongo.Collection
+	DB *db.DB
 }
 
-func NewAuthHandler(db *mongo.Database) *AuthHandler {
-	return &AuthHandler{Collection: db.Collection("admins")}
+func NewAuthHandler(database *db.DB) *AuthHandler {
+	return &AuthHandler{DB: database}
 }
 
 type loginRequest struct {
@@ -47,10 +45,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	var admin models.Admin
-	err := h.Collection.FindOne(context.Background(), bson.M{"username": req.Username}).Decode(&admin)
-	if err != nil {
+	admin, err := h.DB.GetAdminByUsername(c.Request.Context(), req.Username)
+	if errors.Is(err, db.ErrNotFound) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query admin"})
 		return
 	}
 
@@ -64,7 +65,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if role == "" {
 		role = "admin"
 		// Persist the role back to DB for future logins
-		h.Collection.UpdateOne(context.Background(), bson.M{"_id": admin.ID}, bson.M{"$set": bson.M{"role": "admin"}})
+		admin.Role = "admin"
+		_ = h.DB.CreateAdmin(c.Request.Context(), admin) // PutItem overwrites
 	}
 
 	secret := os.Getenv("JWT_SECRET")
@@ -84,7 +86,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 func (h *AuthHandler) SeedAdmin(c *gin.Context) {
 	// Check if any admin exists
-	count, _ := h.Collection.CountDocuments(context.Background(), bson.M{})
+	count, err := h.DB.CountAdmins(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check admins"})
+		return
+	}
 	if count > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "admin already exists, seed is one-time only"})
 		return
@@ -102,13 +108,12 @@ func (h *AuthHandler) SeedAdmin(c *gin.Context) {
 		return
 	}
 
-	admin := models.Admin{
+	admin := &models.Admin{
 		Username:     req.Username,
 		PasswordHash: string(hash),
 		Role:         "admin",
 	}
-	_, err = h.Collection.InsertOne(context.Background(), admin)
-	if err != nil {
+	if err := h.DB.CreateAdmin(c.Request.Context(), admin); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create admin"})
 		return
 	}
@@ -124,8 +129,8 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 	}
 
 	// Check if username already exists
-	existing := h.Collection.FindOne(context.Background(), bson.M{"username": req.Username})
-	if existing.Err() == nil {
+	existing, _ := h.DB.GetAdminByUsername(c.Request.Context(), req.Username)
+	if existing != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
 		return
 	}
@@ -136,13 +141,12 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	user := models.Admin{
+	user := &models.Admin{
 		Username:     req.Username,
 		PasswordHash: string(hash),
 		Role:         req.Role,
 	}
-	_, err = h.Collection.InsertOne(context.Background(), user)
-	if err != nil {
+	if err := h.DB.CreateAdmin(c.Request.Context(), user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
@@ -151,45 +155,35 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 }
 
 func (h *AuthHandler) ListUsers(c *gin.Context) {
-	cursor, err := h.Collection.Find(context.Background(), bson.M{})
+	admins, err := h.DB.ListAdmins(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
 		return
 	}
-	defer cursor.Close(context.Background())
-
-	var users []models.Admin
-	if err := cursor.All(context.Background(), &users); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode users"})
-		return
-	}
-
-	c.JSON(http.StatusOK, users)
+	c.JSON(http.StatusOK, admins)
 }
 
 func (h *AuthHandler) DeleteUser(c *gin.Context) {
 	id := c.Param("id")
-	objectID, err := primitive.ObjectIDFromHex(id)
+
+	user, err := h.DB.GetAdminByID(c.Request.Context(), id)
+	if errors.Is(err, db.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
 		return
 	}
 
 	// Prevent deleting yourself
 	currentUser, _ := c.Get("username")
-	var user models.Admin
-	err = h.Collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&user)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-		return
-	}
 	if user.Username == currentUser {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete your own account"})
 		return
 	}
 
-	_, err = h.Collection.DeleteOne(context.Background(), bson.M{"_id": objectID})
-	if err != nil {
+	if err := h.DB.DeleteAdmin(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
 		return
 	}

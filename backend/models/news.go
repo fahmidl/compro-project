@@ -1,16 +1,14 @@
 package models
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
 type NewsPost struct {
-	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Title       string             `json:"title" bson:"title"`
-	Slug        string             `json:"slug" bson:"slug"`
-	Content     string             `json:"content" bson:"content"`
-	Summary     string             `json:"summary" bson:"summary"`
-	Image       string             `json:"image" bson:"image"`
-	Author      string             `json:"author" bson:"author"`
-	PublishedAt primitive.DateTime `json:"publishedAt" bson:"publishedAt"`
-	CreatedAt   primitive.DateTime `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   primitive.DateTime `json:"updatedAt" bson:"updatedAt"`
+	ID          string `json:"id" dynamodbav:"id"`
+	Title       string `json:"title" dynamodbav:"title"`
+	Slug        string `json:"slug" dynamodbav:"slug"`
+	Content     string `json:"content" dynamodbav:"content"`
+	Summary     string `json:"summary" dynamodbav:"summary"`
+	Image       string `json:"image" dynamodbav:"image"`
+	Author      string `json:"author" dynamodbav:"author"`
+	PublishedAt int64  `json:"publishedAt" dynamodbav:"publishedAt"`
+	CreatedAt   int64  `json:"createdAt" dynamodbav:"createdAt"`
+	UpdatedAt   int64  `json:"updatedAt" dynamodbav:"updatedAt"`
 }

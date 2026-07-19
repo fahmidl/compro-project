@@ -1,33 +1,32 @@
 package handlers
 
 import (
-	"context"
+	"errors"
 	"net/http"
 
+	"compro-backend/db"
 	"compro-backend/models"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ContentHandler struct {
-	Collection *mongo.Collection
+	DB *db.DB
 }
 
-func NewContentHandler(db *mongo.Database) *ContentHandler {
-	return &ContentHandler{Collection: db.Collection("site_content")}
+func NewContentHandler(database *db.DB) *ContentHandler {
+	return &ContentHandler{DB: database}
 }
 
 func (h *ContentHandler) GetContent(c *gin.Context) {
-	var content models.SiteContent
-	err := h.Collection.FindOne(context.Background(), bson.M{}).Decode(&content)
-	if err == mongo.ErrNoDocuments {
+	content, err := h.DB.GetContent(c.Request.Context())
+	if errors.Is(err, db.ErrNotFound) {
 		// seed default content
 		def := models.DefaultSiteContent()
-		res, _ := h.Collection.InsertOne(context.Background(), def)
-		def.ID = res.InsertedID.(primitive.ObjectID)
+		if err := h.DB.PutContent(c.Request.Context(), &def); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to seed default content"})
+			return
+		}
 		c.JSON(http.StatusOK, def)
 		return
 	}
@@ -45,29 +44,16 @@ func (h *ContentHandler) UpdateContent(c *gin.Context) {
 		return
 	}
 
-	// Find existing document
-	var existing models.SiteContent
-	err := h.Collection.FindOne(context.Background(), bson.M{}).Decode(&existing)
-	if err == mongo.ErrNoDocuments {
-		// Insert new
-		res, err := h.Collection.InsertOne(context.Background(), updated)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create content"})
-			return
-		}
-		updated.ID = res.InsertedID.(primitive.ObjectID)
-		c.JSON(http.StatusOK, updated)
-		return
-	}
-	if err != nil {
+	// Check if existing content exists; if so, preserve the ID
+	existing, err := h.DB.GetContent(c.Request.Context())
+	if err == nil && existing != nil {
+		updated.ID = existing.ID
+	} else if !errors.Is(err, db.ErrNotFound) && err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 		return
 	}
 
-	// Update existing document (preserve ID)
-	updated.ID = existing.ID
-	_, err = h.Collection.ReplaceOne(context.Background(), bson.M{"_id": existing.ID}, updated)
-	if err != nil {
+	if err := h.DB.PutContent(c.Request.Context(), &updated); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update content"})
 		return
 	}

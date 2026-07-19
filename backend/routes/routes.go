@@ -1,18 +1,19 @@
 package routes
 
 import (
+	"compro-backend/db"
 	"compro-backend/handlers"
 	"compro-backend/middleware"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func SetupRoutes(r *gin.Engine, db *mongo.Database, uploadDir string) {
-	contentHandler := handlers.NewContentHandler(db)
-	authHandler := handlers.NewAuthHandler(db)
-	uploadHandler := handlers.NewUploadHandler(uploadDir)
-	newsHandler := handlers.NewNewsHandler(db)
+func SetupRoutes(r *gin.Engine, database *db.DB, s3Client *s3.Client) {
+	contentHandler := handlers.NewContentHandler(database)
+	authHandler := handlers.NewAuthHandler(database)
+	uploadHandler := handlers.NewUploadHandler(s3Client)
+	newsHandler := handlers.NewNewsHandler(database)
 
 	api := r.Group("/api")
 	{

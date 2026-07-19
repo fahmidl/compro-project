@@ -1,41 +1,40 @@
 package models
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
 type SectionVisibility struct {
-	Title   string `json:"title" bson:"title"`
-	Visible bool   `json:"visible" bson:"visible"`
+	Title   string `json:"title" dynamodbav:"title"`
+	Visible bool   `json:"visible" dynamodbav:"visible"`
 }
 
 type HeroSection struct {
-	SectionVisibility `bson:",inline"`
-	Subtitle          string `json:"subtitle" bson:"subtitle"`
-	BackgroundImage   string `json:"backgroundImage" bson:"backgroundImage"`
+	SectionVisibility
+	Subtitle        string `json:"subtitle" dynamodbav:"subtitle"`
+	BackgroundImage string `json:"backgroundImage" dynamodbav:"backgroundImage"`
 }
 
 type AboutSection struct {
-	SectionVisibility `bson:",inline"`
-	Description       string `json:"description" bson:"description"`
-	Image             string `json:"image" bson:"image"`
+	SectionVisibility
+	Description string `json:"description" dynamodbav:"description"`
+	Image       string `json:"image" dynamodbav:"image"`
 }
 
 type ContactSection struct {
-	SectionVisibility `bson:",inline"`
-	Address           string `json:"address" bson:"address"`
-	Phone             string `json:"phone" bson:"phone"`
-	Email             string `json:"email" bson:"email"`
-	MapEmbedURL       string `json:"mapEmbedUrl" bson:"mapEmbedUrl"`
+	SectionVisibility
+	Address     string `json:"address" dynamodbav:"address"`
+	Phone       string `json:"phone" dynamodbav:"phone"`
+	Email       string `json:"email" dynamodbav:"email"`
+	MapEmbedURL string `json:"mapEmbedUrl" dynamodbav:"mapEmbedUrl"`
 }
 
 type SiteContent struct {
-	ID      primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Hero    HeroSection        `json:"hero" bson:"hero"`
-	About   AboutSection       `json:"about" bson:"about"`
-	Contact ContactSection     `json:"contact" bson:"contact"`
+	ID      string         `json:"id" dynamodbav:"id"`
+	Hero    HeroSection    `json:"hero" dynamodbav:"hero"`
+	About   AboutSection   `json:"about" dynamodbav:"about"`
+	Contact ContactSection `json:"contact" dynamodbav:"contact"`
 }
 
 func DefaultSiteContent() SiteContent {
 	return SiteContent{
+		ID: "site-content",
 		Hero: HeroSection{
 			SectionVisibility: SectionVisibility{Title: "Welcome to Our Company", Visible: true},
 			Subtitle:          "Delivering excellence since day one",

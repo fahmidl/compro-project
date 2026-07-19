@@ -4,43 +4,43 @@ import (
 	"context"
 	"log"
 	"os"
-	"time"
 
+	"compro-backend/db"
 	"compro-backend/routes"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func main() {
+var (
+	ginEngine *gin.Engine
+	adapter   *ginadapter.GinLambda
+)
+
+func init() {
+	// Load .env in local dev; Lambda provides env vars automatically
 	godotenv.Load()
 
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = "mongodb://localhost:27017"
-	}
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "compro"
-	}
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	// Load AWS SDK config (uses default credentials chain)
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background())
 	if err != nil {
-		log.Fatal("Failed to connect to MongoDB:", err)
+		log.Fatal("failed to load AWS config:", err)
 	}
-	defer client.Disconnect(context.Background())
 
-	db := client.Database(dbName)
+	// Initialize DynamoDB client
+	dynamoClient := dynamodb.NewFromConfig(cfg)
+	database := db.NewDB(dynamoClient)
 
+	// Initialize S3 client
+	s3Client := s3.NewFromConfig(cfg)
+
+	// Build the Gin engine
 	r := gin.Default()
 
 	// CORS
@@ -55,12 +55,30 @@ func main() {
 		c.Next()
 	})
 
-	// Serve uploaded files as static
-	r.Static("/uploads", "./uploads")
-
 	// Setup API routes
-	routes.SetupRoutes(r, db, "./uploads")
+	routes.SetupRoutes(r, database, s3Client)
 
-	log.Printf("Server running on port %s", port)
-	r.Run(":" + port)
+	ginEngine = r
+	adapter = ginadapter.New(ginEngine)
+}
+
+// Lambda handler — receives API Gateway proxy requests and delegates to Gin.
+func lambdaHandler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	return adapter.ProxyWithContext(ctx, req)
+}
+
+func main() {
+	if os.Getenv("AWS_LAMBDA") != "" || os.Getenv("AWS_EXECUTION_ENV") != "" || os.Getenv("_HANDLER") != "" {
+		// Running inside AWS Lambda
+		log.Println("Starting Lambda handler")
+		lambda.Start(lambdaHandler)
+	} else {
+		// Local development
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		log.Printf("Server running on port %s", port)
+		ginEngine.Run(":" + port)
+	}
 }
